@@ -1,0 +1,16 @@
+.env
+node_modules
+results.json
+results.csv
+results.html
+results.txt
+results.log
+results.json.gz
+results.csv.gz
+results.html.gz
+results.txt.gz
+results.log.gz
+dist
+dist/*
+node_modules
+node_modules/*

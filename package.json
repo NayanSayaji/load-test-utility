@@ -1,0 +1,34 @@
+{
+  "name": "load-test",
+  "version": "1.0.0",
+  "description": "",
+  "main": "dist/load.js",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "start": "node dist/load.js",
+    "load-test": "npm run build && npm run start",
+    "load-test:progress": "PROGRESS=true npm run load-test",
+    "load-test:multi": "TEST_TYPE=multi-config npm run load-test",
+    "load-test:single": "TEST_TYPE=single-config npm run load-test",
+    "load-test:preset": "TEST_TYPE=preset USE_PRESET=pharma-api npm run load-test",
+    "load-test:weighted": "TEST_TYPE=weighted npm run load-test",
+    "load-test:round-robin": "TEST_TYPE=multi-config DISTRIBUTION_STRATEGY=round_robin npm run load-test",
+    "load-test:equal": "TEST_TYPE=multi-config DISTRIBUTION_STRATEGY=equal npm run load-test",
+    "load-test:proportional": "TEST_TYPE=multi-config DISTRIBUTION_STRATEGY=proportional npm run load-test",
+    "help": "npm run build && node dist/load.js --help",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "packageManager": "pnpm@10.19.0",
+  "dependencies": {
+    "axios": "^1.6.0",
+    "dotenv": "^17.2.3"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "typescript": "^5.0.0"
+  }
+}
