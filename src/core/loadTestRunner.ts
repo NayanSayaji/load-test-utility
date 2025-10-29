@@ -6,6 +6,7 @@
 import { HttpClient } from '../utils/httpClient';
 import { ResultAnalyzer } from '../utils/resultAnalyzer';
 import { LoadTestConfig, RequestResult, LoadTestSummary } from '../types/load.types';
+import { RateLimiter } from '../utils/rateLimiter';
 
 export class LoadTestRunner {
     private config: LoadTestConfig;
@@ -21,11 +22,20 @@ export class LoadTestRunner {
         console.log(`🚀 Starting load test with ${this.config.totalRequests} requests (concurrency: ${this.config.concurrency})`);
         console.log(`📡 Target URL: ${this.config.url}`);
         console.log(`⏱️  Method: ${this.config.method || 'GET'}`);
+
+        if (this.config.requestsPerSecond) {
+            console.log(`🎯 Rate Limited: ${this.config.requestsPerSecond} RPS`);
+        }
         console.log('');
 
         const startTime = Date.now();
 
         try {
+            // Create rate limiter if RPS is specified
+            const rateLimiter = this.config.requestsPerSecond
+                ? new RateLimiter(this.config.requestsPerSecond)
+                : undefined;
+
             // Execute load test
             const results = await HttpClient.sendConcurrentRequests(
                 this.config.url,
@@ -34,7 +44,10 @@ export class LoadTestRunner {
                     headers: this.config.headers,
                 },
                 this.config.totalRequests,
-                this.config.concurrency
+                this.config.concurrency,
+                this.config.id,
+                undefined, // responseOptions
+                rateLimiter
             );
 
             const totalTime = Date.now() - startTime;
@@ -55,6 +68,7 @@ export class LoadTestRunner {
             // Save results
             ResultAnalyzer.saveResults(enhancedSummary, 'results.json');
             ResultAnalyzer.saveResultsAsCSV(results, 'results.csv');
+            ResultAnalyzer.generateHTMLReport(enhancedSummary, this.config, 'report.html');
 
             console.log(`🎯 Load test completed in ${(totalTime / 1000).toFixed(2)} seconds`);
             console.log(`📈 Throughput: ${enhancedSummary.requestsPerSecond} requests/second`);
@@ -79,6 +93,10 @@ export class LoadTestRunner {
         const startTime = Date.now();
 
         // Progress tracking
+        /**
+         * rate : requests per second
+         * elapsed : time taken in seconds for completed requests (completed / elapsed)
+         */
         const progressInterval = setInterval(() => {
             const elapsed = (Date.now() - startTime) / 1000;
             const rate = completed / elapsed;
@@ -110,7 +128,6 @@ export class LoadTestRunner {
                 }
                 await Promise.race(active);
             }
-
             await Promise.all(active);
             clearInterval(progressInterval);
 
@@ -126,6 +143,7 @@ export class LoadTestRunner {
             ResultAnalyzer.printSummary(enhancedSummary);
             ResultAnalyzer.saveResults(enhancedSummary, 'results.json');
             ResultAnalyzer.saveResultsAsCSV(results, 'results.csv');
+            ResultAnalyzer.generateHTMLReport(enhancedSummary, this.config, 'report.html');
 
             console.log(`🎯 Load test completed in ${(totalTime / 1000).toFixed(2)} seconds`);
             console.log(`📈 Throughput: ${enhancedSummary.requestsPerSecond} requests/second`);

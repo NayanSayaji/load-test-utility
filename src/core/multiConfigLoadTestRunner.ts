@@ -9,6 +9,7 @@
 import { HttpClient } from '../utils/httpClient';
 import { ResultAnalyzer } from '../utils/resultAnalyzer';
 import { DistributionStrategyFactory } from '../strategies/distributionStrategy';
+import { RateLimiter } from '../utils/rateLimiter';
 import {
     MultiConfigLoadTest,
     LoadTestConfig,
@@ -36,6 +37,10 @@ export class MultiConfigLoadTestRunner {
             saveResults: true,
             outputDir: '.',
             generateCSV: true,
+            storeResponseBody: false,
+            storeResponseHeaders: false,
+            maxResponseBodySize: 10000,
+            truncateLargeResponses: true,
             ...options
         };
     }
@@ -68,7 +73,7 @@ export class MultiConfigLoadTestRunner {
             const summary = ResultAnalyzer.analyzeResults(results, totalTime);
 
             // Display and save results
-            this.handleResults(summary);
+            this.handleResults(summary, this.multiConfig.configs[0]);
 
             console.log(`🎯 Multi-config load test completed in ${(totalTime / 1000).toFixed(2)} seconds`);
 
@@ -112,11 +117,11 @@ export class MultiConfigLoadTestRunner {
             completed = loadTestResults.length;
 
             clearInterval(progressInterval);
-
+            console.log(distributionPlan)
             const totalTime = Date.now() - startTime;
             const summary = ResultAnalyzer.analyzeResults(loadTestResults, totalTime);
 
-            this.handleResults(summary);
+            this.handleResults(summary, this.multiConfig.configs[0]);
 
             console.log(`🎯 Multi-config load test completed in ${(totalTime / 1000).toFixed(2)} seconds`);
 
@@ -171,6 +176,15 @@ export class MultiConfigLoadTestRunner {
 
             console.log(`🔄 Executing ${planItem.requestCount} requests for config: ${config.id}`);
 
+            // Create rate limiter if RPS is specified for this config
+            const rateLimiter = config.requestsPerSecond
+                ? new RateLimiter(config.requestsPerSecond)
+                : undefined;
+
+            if (rateLimiter) {
+                console.log(`🎯 Rate Limited: ${config.requestsPerSecond} RPS for config: ${config.id}`);
+            }
+
             const configResults = await HttpClient.sendConcurrentRequests(
                 config.url,
                 {
@@ -181,7 +195,14 @@ export class MultiConfigLoadTestRunner {
                 },
                 planItem.requestCount,
                 this.getEffectiveConcurrency(config),
-                config.id
+                config.id,
+                {
+                    storeResponseBody: this.options.storeResponseBody,
+                    storeResponseHeaders: this.options.storeResponseHeaders,
+                    maxResponseBodySize: this.options.maxResponseBodySize,
+                    truncateLargeResponses: this.options.truncateLargeResponses
+                },
+                rateLimiter
             );
 
             // Update request numbers and config IDs
@@ -253,9 +274,20 @@ export class MultiConfigLoadTestRunner {
         let current = 0;
         const active = new Set<Promise<void>>();
 
+        // Create rate limiter if RPS is specified for this config
+        const rateLimiter = config.requestsPerSecond
+            ? new RateLimiter(config.requestsPerSecond)
+            : undefined;
+
         while (current < requestCount) {
             while (active.size < this.getEffectiveConcurrency(config) && current < requestCount) {
                 const reqNo = startRequestNo + current++;
+
+                // Wait for rate limiter if specified
+                if (rateLimiter) {
+                    await rateLimiter.waitForSlot();
+                }
+
                 const promise = HttpClient.sendRequest(
                     config.url,
                     {
@@ -265,7 +297,13 @@ export class MultiConfigLoadTestRunner {
                         timeout: config.timeout
                     },
                     reqNo,
-                    config.id
+                    config.id,
+                    {
+                        storeResponseBody: this.options.storeResponseBody,
+                        storeResponseHeaders: this.options.storeResponseHeaders,
+                        maxResponseBodySize: this.options.maxResponseBodySize,
+                        truncateLargeResponses: this.options.truncateLargeResponses
+                    }
                 ).then(result => {
                     const updatedResult = {
                         ...result,
@@ -301,7 +339,7 @@ export class MultiConfigLoadTestRunner {
      * 
      * @param summary - Load test summary
      */
-    private handleResults(summary: LoadTestSummary): void {
+    private handleResults(summary: LoadTestSummary, config: LoadTestConfig): void {
         // Display summary
         ResultAnalyzer.printSummary(summary);
 
@@ -312,7 +350,7 @@ export class MultiConfigLoadTestRunner {
             if (this.options.generateCSV) {
                 ResultAnalyzer.saveResultsAsCSV(summary.details, 'results.csv', this.options.outputDir);
                 ResultAnalyzer.saveConfigSummariesAsCSV(summary.configSummaries, 'config-summaries.csv', this.options.outputDir);
-                ResultAnalyzer.generateHTMLReport(summary, 'report.html', this.options.outputDir);
+                ResultAnalyzer.generateHTMLReport(summary, config, 'report.html', this.options.outputDir);
             }
         }
     }

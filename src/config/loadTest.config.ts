@@ -2,10 +2,8 @@
  * Load Test Configuration
  * Centralized configuration for load testing parameters
  */
-import dotenv from 'dotenv';
 import { LoadTestConfig } from '../types/load.types';
 
-dotenv.config();
 
 export const loadTestConfig: LoadTestConfig = {
     id: 'loadTest1',
@@ -29,3 +27,14 @@ export const loadTestConfig: LoadTestConfig = {
 export function getConfig(overrides?: Partial<LoadTestConfig>): LoadTestConfig {
     return { ...loadTestConfig, ...overrides };
 }
+
+export const SECTION_MAP_KEYS = {
+    PARTICULAR_DETAILS: 'particularsOfEntity',
+    PROJECT_OVERVIEW: 'projectOverview',
+    PROJECT_TEAM: 'projectTeam',
+    PROJECT_DETAILS: 'projectDetails',
+    PROJECT_PROPOSAL: 'projectProposal',
+    CO_FUNDING: 'coFunding',
+    ACADEMIC_PARTNERSHIP: 'academicPartnership',
+    PROJECT_APPLICATION_FEES: 'projectApplicationFee',
+};

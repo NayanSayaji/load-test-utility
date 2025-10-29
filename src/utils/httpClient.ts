@@ -5,6 +5,7 @@
 
 import axios, { AxiosRequestConfig, AxiosResponse } from 'axios';
 import { RequestResult, HttpRequestOptions } from '../types/load.types';
+import { RateLimiter } from './rateLimiter';
 
 export class HttpClient {
     /**
@@ -14,7 +15,13 @@ export class HttpClient {
         url: string,
         options: HttpRequestOptions,
         reqNo: number,
-        configId: string = 'default'
+        configId: string = 'default',
+        responseOptions?: {
+            storeResponseBody?: boolean;
+            storeResponseHeaders?: boolean;
+            maxResponseBodySize?: number;
+            truncateLargeResponses?: boolean;
+        }
     ): Promise<RequestResult> {
         const start = Date.now();
 
@@ -34,6 +41,30 @@ export class HttpClient {
             const status = response.status;
             const success = status >= 200 && status < 300;
 
+            // Extract response data
+            const responseSize = response.data ? JSON.stringify(response.data).length : 0;
+            let responseBody: string | undefined;
+            let responseHeaders: Record<string, string> | undefined;
+            let responseTruncated = false;
+
+            // Store response body if enabled
+            if (responseOptions?.storeResponseBody) {
+                const maxSize = responseOptions.maxResponseBodySize || 10000; // Default 10KB
+                const bodyStr = typeof response.data === 'string' ? response.data : JSON.stringify(response.data);
+
+                if (bodyStr.length > maxSize && responseOptions.truncateLargeResponses) {
+                    responseBody = bodyStr.substring(0, maxSize) + '... [TRUNCATED]';
+                    responseTruncated = true;
+                } else {
+                    responseBody = bodyStr;
+                }
+            }
+
+            // Store response headers if enabled
+            if (responseOptions?.storeResponseHeaders) {
+                responseHeaders = response.headers as Record<string, string>;
+            }
+
             return {
                 reqNo,
                 configId,
@@ -41,6 +72,10 @@ export class HttpClient {
                 success,
                 timeTakenMs: timeTaken,
                 timestamp: new Date().toISOString(),
+                responseSize,
+                responseBody,
+                responseHeaders,
+                responseTruncated
             };
         } catch (error: any) {
             const timeTaken = Date.now() - start;
@@ -65,8 +100,12 @@ export class HttpClient {
                 status,
                 success: false,
                 timeTakenMs: timeTaken,
-                error: errorMessage,
+                error: JSON.stringify(error),
                 timestamp: new Date().toISOString(),
+                responseSize: 0,
+                responseBody: undefined,
+                responseHeaders: undefined,
+                responseTruncated: false
             };
         }
     }
@@ -79,7 +118,14 @@ export class HttpClient {
         options: HttpRequestOptions,
         totalRequests: number,
         concurrency: number,
-        configId: string = 'default'
+        configId: string = 'default',
+        responseOptions?: {
+            storeResponseBody?: boolean;
+            storeResponseHeaders?: boolean;
+            maxResponseBodySize?: number;
+            truncateLargeResponses?: boolean;
+        },
+        rateLimiter?: RateLimiter
     ): Promise<RequestResult[]> {
         const results: RequestResult[] = [];
         let current = 0;
@@ -89,7 +135,13 @@ export class HttpClient {
             // Start new requests up to concurrency limit
             while (active.size < concurrency && current < totalRequests) {
                 const reqNo = ++current;
-                const promise = this.sendRequest(url, options, reqNo, configId)
+
+                // Wait for rate limiter if specified
+                if (rateLimiter) {
+                    await rateLimiter.waitForSlot();
+                }
+
+                const promise = this.sendRequest(url, options, reqNo, configId, responseOptions)
                     .then(result => {
                         results.push(result);
                         active.delete(promise);

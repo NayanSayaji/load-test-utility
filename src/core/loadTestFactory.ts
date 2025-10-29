@@ -14,6 +14,28 @@ import {
     LoadTestOptions,
     DistributionStrategy
 } from '../types/load.types';
+import { SECTION_MAP_KEYS } from '../config/loadTest.config';
+
+const PRIP_API_CONFIGS = (id: string, step: string): LoadTestConfig => ({
+    id: `${id}-${step}`,
+    // url: `https://prip.pharma-dept.gov.in/api/project/${id}/details/${step}`,
+    url: `https://prip.pharma-dept.gov.in/api/project?page=1&sortColumn=createdAt&sortOrder=DESC`,
+    totalRequests: 1000,
+    concurrency: 100,
+    requestsPerSecond: 100,
+    method: 'GET',
+    headers: {
+        'Sec-Fetch-Site': 'same-origin',
+        'Sec-Fetch-Mode': 'cors',
+        'accept': 'application/json, text/html, */*',
+        'accept-language': 'en-GB,en-US;q=0.9,en;q=0.8',
+        'authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6ImU2NThlN2Q1LTBiOTctNDhkMS04ODA1LTZmYjg0YjY1Zjg2ZCIsImlhdCI6MTc2MTcxNDU1NiwiZXhwIjoxNzYxNzE4MTU2fQ.u0TVexG-8lSUsByD1N1feoqvFpIyQCEpuJZRYTQSkL8',
+        'ngrok-skip-browser-warning': 'true',
+        'x-api-key': 'wWHpU1gJOB4vALtObKanPljBWDxBp79B',
+        'Referer': 'https://prip.pharma-dept.gov.in/project/59e3d6ed-ac6a-431d-967a-67bb7c228d55',
+        'User-Agent': 'mozilla/5.0 (windows nt 10.0; win64; x64) applewebkit/537.36 (khtml, like gecko) chrome/120.0.0.0 safari/537.36'
+    }
+})
 
 /**
  * Load test factory for creating different types of load tests
@@ -151,23 +173,9 @@ export class LoadTestFactory {
             },
             'pharma-api': {
                 configs: [
-                    {
-                        id: 'pharma-details',
-                        url: 'https://prip.pharma-dept.gov.in/api/project/59e3d6ed-ac6a-431d-967a-67bb7c228d55/details/projectDetails',
-                        totalRequests: 20,
-                        concurrency: 10,
-                        method: 'GET',
-                        headers: {
-                            'accept': 'application/json, text/plain, */*',
-                            'accept-language': 'en-GB,en-US;q=0.9,en;q=0.8',
-                            'authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6ImU2NThlN2Q1LTBiOTctNDhkMS04ODA1LTZmYjg0YjY1Zjg2ZCIsImlhdCI6MTc2MTYzMzE4MCwiZXhwIjoxNzYxNjM2NzgwfQ.vlhYtMTOyG-cyG1AVtEnLys1duWBhCyEya9LDXdgkS0',
-                            'ngrok-skip-browser-warning': 'true',
-                            'x-api-key': 'wWHpU1gJOB4vALtObKanPljBWDxBp79B',
-                            'Referer': 'https://prip.pharma-dept.gov.in/project/59e3d6ed-ac6a-431d-967a-67bb7c228d55'
-                        }
-                    }
+                    ...Object.values(SECTION_MAP_KEYS).slice(0, 1).map((key: string) => PRIP_API_CONFIGS('be57024a-3688-42e3-90d5-6b8ebd446b7c', key)),
                 ],
-                distributionStrategy: DistributionStrategy.EQUAL
+                distributionStrategy: DistributionStrategy.ROUND_ROBIN
             }
         };
 

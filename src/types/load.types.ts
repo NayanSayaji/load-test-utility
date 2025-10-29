@@ -33,6 +33,8 @@ export interface LoadTestConfig {
     totalRequests: number;
     /** Maximum concurrent requests for this config */
     concurrency: number;
+    /** Requests per second (RPS) - if specified, overrides concurrency-based pacing */
+    requestsPerSecond?: number;
     /** Target URL for the API endpoint */
     url: string;
     /** HTTP headers to include in requests */
@@ -82,11 +84,17 @@ export interface RequestResult {
     /** Time taken for the request in milliseconds */
     timeTakenMs: number;
     /** Error message if request failed */
-    error?: string;
+    error?: any;
     /** Timestamp when request completed */
     timestamp: string;
     /** Response size in bytes (if available) */
     responseSize?: number;
+    /** Response body content (if enabled) */
+    responseBody?: string;
+    /** Response headers (if enabled) */
+    responseHeaders?: Record<string, string>;
+    /** Whether response was truncated due to size limits */
+    responseTruncated?: boolean;
 }
 
 /**
@@ -194,4 +202,12 @@ export interface LoadTestOptions {
     outputDir?: string;
     /** Whether to generate CSV output */
     generateCSV?: boolean;
+    /** Whether to store response bodies */
+    storeResponseBody?: boolean;
+    /** Whether to store response headers */
+    storeResponseHeaders?: boolean;
+    /** Maximum response body size to store (in bytes) */
+    maxResponseBodySize?: number;
+    /** Whether to truncate large responses */
+    truncateLargeResponses?: boolean;
 }

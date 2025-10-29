@@ -1,3 +1,6 @@
+
+import dotenv from 'dotenv';
+dotenv.config();
 /**
  * Load Testing Application - Main Entry Point
  * 
@@ -18,6 +21,7 @@ const exampleConfigs: LoadTestConfig[] = [
         url: 'https://jsonplaceholder.typicode.com/posts',
         totalRequests: 5,
         concurrency: 3,
+        requestsPerSecond: 2, // Rate limited to 2 RPS
         method: 'GET',
         headers: { 'Content-Type': 'application/json' },
         weight: 1
@@ -27,6 +31,7 @@ const exampleConfigs: LoadTestConfig[] = [
         url: 'https://jsonplaceholder.typicode.com/users',
         totalRequests: 5,
         concurrency: 3,
+        // No RPS specified - uses concurrency-based pacing
         method: 'GET',
         headers: { 'Content-Type': 'application/json' },
         weight: 2
@@ -36,6 +41,7 @@ const exampleConfigs: LoadTestConfig[] = [
         url: 'https://jsonplaceholder.typicode.com/comments',
         totalRequests: 5,
         concurrency: 3,
+        requestsPerSecond: 1, // Rate limited to 1 RPS
         method: 'GET',
         headers: { 'Content-Type': 'application/json' },
         weight: 1
@@ -54,7 +60,7 @@ async function runLoadTest() {
         const totalRequests = parseInt(process.env.TOTAL_REQUESTS || '15');
         const distributionStrategy = (process.env.DISTRIBUTION_STRATEGY as DistributionStrategy) || DistributionStrategy.ROUND_ROBIN;
         const showProgress = process.env.PROGRESS === 'true';
-        const usePreset = process.env.USE_PRESET;
+        const usePreset = process.env.USE_PRESET || 'pharma-api';
 
         let loadTestRunner;
 
@@ -64,7 +70,11 @@ async function runLoadTest() {
                 loadTestRunner = LoadTestFactory.createSingleConfigLoadTest(exampleConfigs[0], {
                     showProgress,
                     saveResults: true,
-                    generateCSV: true
+                    generateCSV: true,
+                    storeResponseBody: true,
+                    storeResponseHeaders: true,
+                    maxResponseBodySize: 5000,
+                    truncateLargeResponses: true
                 });
                 break;
 
@@ -78,7 +88,11 @@ async function runLoadTest() {
                     {
                         showProgress,
                         saveResults: true,
-                        generateCSV: true
+                        generateCSV: true,
+                        storeResponseBody: true,
+                        storeResponseHeaders: true,
+                        maxResponseBodySize: 5000,
+                        truncateLargeResponses: true
                     }
                 );
                 break;
@@ -93,7 +107,11 @@ async function runLoadTest() {
                 loadTestRunner = LoadTestFactory.createFromPreset(usePreset, totalRequests, {
                     showProgress,
                     saveResults: true,
-                    generateCSV: true
+                    generateCSV: true,
+                    storeResponseBody: true,
+                    storeResponseHeaders: true,
+                    maxResponseBodySize: 5000,
+                    truncateLargeResponses: true
                 });
                 break;
 
@@ -107,7 +125,11 @@ async function runLoadTest() {
                     {
                         showProgress,
                         saveResults: true,
-                        generateCSV: true
+                        generateCSV: true,
+                        storeResponseBody: true,
+                        storeResponseHeaders: true,
+                        maxResponseBodySize: 5000,
+                        truncateLargeResponses: true
                     }
                 );
                 break;
@@ -117,7 +139,11 @@ async function runLoadTest() {
                 loadTestRunner = LoadTestFactory.createWithWeights(exampleConfigs, totalRequests, {
                     showProgress,
                     saveResults: true,
-                    generateCSV: true
+                    generateCSV: true,
+                    storeResponseBody: true,
+                    storeResponseHeaders: true,
+                    maxResponseBodySize: 5000,
+                    truncateLargeResponses: true
                 });
                 break;
 
@@ -157,6 +183,10 @@ Environment Variables:
   USE_PRESET            - Preset name for preset tests
   CONFIG_IDS            - Comma-separated config IDs for environment tests
 
+RPS (Requests Per Second) Configuration:
+  GLOBAL_RPS            - Global RPS limit for all configurations
+  CONFIG_RPS            - Per-config RPS limits (format: configId:rps,configId:rps)
+
 Examples:
   # Run multi-config test with round-robin distribution
   TEST_TYPE=multi-config TOTAL_REQUESTS=20 DISTRIBUTION_STRATEGY=round_robin npm run start
@@ -169,6 +199,12 @@ Examples:
 
   # Run single config test
   TEST_TYPE=single-config npm run start
+
+  # Run with rate limiting (10 RPS globally)
+  GLOBAL_RPS=10 npm run start
+
+  # Run with per-config rate limiting
+  CONFIG_RPS=api1:5,api2:10,api3:2 npm run start
 
 Available Presets: ${LoadTestFactory.listPresets().join(', ')}
 `);
